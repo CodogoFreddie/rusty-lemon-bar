@@ -1,0 +1,6 @@
+[package]
+name = "rusty-lemon-bar"
+version = "0.1.0"
+authors = ["Freddie Ridell <freddie@codogo.io>"]
+
+[dependencies]
