@@ -1,114 +1,52 @@
-use std::{thread, time, fmt};
+use std::{thread, time};
+use std::io::{stdout, Write};
+use std::sync::mpsc;
+use std::collections::HashMap;
 
+extern crate chrono;
+use chrono::prelude::*;
 
-enum Movement {
-    Left,
-    Center,
-    Right,
-    Window(u32),
+mod format;
+use format::{Format, Color};
+
+enum Blocks {
+    Clock,
 }
 
-enum Color {
-    Black,
-    Red,
-    Green,
-    Yellow,
-    Blue,
-    Purple,
-    Orange,
-    White,
-}
+fn clock(tx: std::sync::mpsc::Sender<(Blocks, String)>) -> () {
+    loop {
+        let date = Local::now(); 
+        let output = format!("{}", date.format("%Y-%m-%d %H:%M:%S"));
+        let formatters = [
+            Format::Foreground(Color::White),
+            Format::Background(Color::Black),
+        ];
 
-impl Color {
-    fn hex(&self) -> &str {
-        use Color::*;
+        let output_formatted = formatters.iter().fold( output, |acc, f| { f.apply(acc) } );
+        tx.send( (
+                Blocks::Clock,
+            output_formatted
+        )).unwrap();
 
-        match *self {
-            Black => "#2c292d",
-            Red => "#ff6188",
-            Green => "#a9dc76",
-            Yellow => "#ffd866",
-            Blue => "#78dce8",
-            Purple => "#ab9df2",
-            Orange => "#fc9867",
-            White => "#fdf9f3",
-        }
-    }
-}
-
-impl fmt::Display for Color {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}", self.hex())
-    }
-}
-
-enum Element {
-    Foreground(Color, Box<Element>),
-    Background(Color, Box<Element>),
-    Command(String, Box<Element>),
-    Underline(Box<Element>),
-    Overline(Box<Element>),
-    Swap(Box<Element>),
-    SwapAt(u32, Box<Element>),
-    Move(Movement, Box<Element>),
-    Raw(String),
-}
-
-fn render_element(el: Element) -> String {
-    use Element::*;
-
-    match el {
-        Foreground(col, child) => format!("%{{F{}}}{}%{{F-}}", col.hex(), render_element(*child)),
-        Background(col, child) => format!("%{{B{}}}{}%{{B-}}", col.hex(), render_element(*child)),
-        Command(com, child) => format!("%{{A:{}:}}{}%{{A}}", com, render_element(*child)),
-        Underline(child) => format!("%{{+u}}{}%{{-u}}", render_element(*child)),
-        Overline(child) => format!("%{{+o}}{}%{{-o}}", render_element(*child)),
-        Swap(child) => format!("%{{R}}{}%{{R}}", render_element(*child)),
-        SwapAt(_, child) => render_element(Swap(child)),
-        Move(_, child) => render_element(*child),
-        Raw(s) => s,
-    }
-}
-
-enum Format {
-    Foreground(Color),
-    Background(Color),
-    Underline,
-    Overline,
-    Swap,
-    SwapAt(f32),
-}
-
-impl Format {
-    fn apply(&self, s: String) -> String {
-        use Format::*;
-
-        match *self {
-            Foreground(ref col) => format!("%{{F{}}}{}%{{F-}}", col, s),
-            Background(ref col) => format!("%{{B{}}}{}%{{B-}}", col, s),
-            Underline => format!("%{{+u}}{}%{{-u}}", s),
-            Overline => format!("%{{+o}}{}%{{-o}}", s),
-            SwapAt(_) => Format::Swap.apply(s),
-            Swap => format!("%{{R}}{}%{{R}}", s), 
-        }
+        thread::sleep( time::Duration::from_millis(1000));
     }
 }
 
 fn main() {
+    let blockRenderers = [ clock, ]; 
 
-    loop {
-        let formatters = [
-            Format::Foreground(Color::Black),
-            Format::Background(Color::White),
-            Format::Underline,
-            Format::Swap
-        ];
+    let (tx, rx) = mpsc::channel();
 
-        let output = formatters.iter().fold( String::from("foo"), |acc, f| { f.apply(acc) } );
-        println!("output = {}", output);
+    for &block in blockRenderers.iter() {
+        let transmitter = mpsc::Sender::clone(&tx);
+        thread::spawn( move || { block(transmitter) });
+    }
 
-        thread::sleep(
-            time::Duration::from_millis(1000)
-        );
+    let mut blockResponses = HashMap::new();
+    for ( block, resp ) in rx {
+        blockResponses.insert(block, resp);
+        print!("\n%{{S1}}{}", resp);
+
+        stdout().flush();
     }
 }
