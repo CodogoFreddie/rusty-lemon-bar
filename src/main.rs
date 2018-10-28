@@ -1,3 +1,6 @@
+use std::{thread, time, fmt};
+
+
 enum Movement {
     Left,
     Center,
@@ -33,6 +36,12 @@ impl Color {
     }
 }
 
+impl fmt::Display for Color {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self.hex())
+    }
+}
+
 enum Element {
     Foreground(Color, Box<Element>),
     Background(Color, Box<Element>),
@@ -61,17 +70,37 @@ fn render_element(el: Element) -> String {
     }
 }
 
+enum Format {
+    Foreground(Color),
+    Background(Color),
+    Underline,
+    Overline,
+    Swap,
+    SwapAt(u32),
+}
+
+impl Format {
+    fn apply(&self, s: String) -> String {
+        use Format::*;
+
+        match *self {
+            Foreground(ref col) => format!("%{{F{}}}{}%{{F-}}", col, s),
+            Background(ref col) => format!("%{{B{}}}{}%{{B-}}", col, s),
+            _ => s
+        }
+    }
+}
 
 fn main() {
-    let demo: Element = Element::Background(
-        Color::Green,
-        Box::new(Element::Foreground(
-            Color::Red,
-            Box::new(Element::Raw(String::from("lol"))),
-        )),
-    );
 
-    let output = render_element(demo);
+    loop {
+        let f = Format::Foreground(Color::Red);
 
-    println!("output = {}", output)
+        let output = f.apply(String::from("foo"));
+        println!("output = {}", output);
+
+        thread::sleep(
+            time::Duration::from_millis(1000)
+        );
+    }
 }
