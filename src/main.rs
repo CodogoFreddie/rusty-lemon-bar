@@ -76,7 +76,7 @@ enum Format {
     Underline,
     Overline,
     Swap,
-    SwapAt(u32),
+    SwapAt(f32),
 }
 
 impl Format {
@@ -86,7 +86,10 @@ impl Format {
         match *self {
             Foreground(ref col) => format!("%{{F{}}}{}%{{F-}}", col, s),
             Background(ref col) => format!("%{{B{}}}{}%{{B-}}", col, s),
-            _ => s
+            Underline => format!("%{{+u}}{}%{{-u}}", s),
+            Overline => format!("%{{+o}}{}%{{-o}}", s),
+            SwapAt(_) => Format::Swap.apply(s),
+            Swap => format!("%{{R}}{}%{{R}}", s), 
         }
     }
 }
@@ -94,9 +97,14 @@ impl Format {
 fn main() {
 
     loop {
-        let f = Format::Foreground(Color::Red);
+        let formatters = [
+            Format::Foreground(Color::Black),
+            Format::Background(Color::White),
+            Format::Underline,
+            Format::Swap
+        ];
 
-        let output = f.apply(String::from("foo"));
+        let output = formatters.iter().fold( String::from("foo"), |acc, f| { f.apply(acc) } );
         println!("output = {}", output);
 
         thread::sleep(
