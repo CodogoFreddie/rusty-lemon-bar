@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::io;
 use std::io::{stdout, Write};
 use std::sync::mpsc;
 use std::{thread, time};
@@ -9,35 +10,20 @@ use chrono::prelude::*;
 mod format;
 use format::{Color, Format};
 
+mod blocks;
+use blocks::get_block_renderers;
+
 #[derive(Debug, PartialEq, Eq, Hash)]
-enum Block {
+pub enum Block {
     Clock,
+    I3(u8),
+    Network,
+    Disk,
 }
 
-struct ThreadResponse {
+pub struct ThreadResponse {
     block: Block,
     msg: String,
-}
-
-fn clock(tx: std::sync::mpsc::Sender<ThreadResponse>) -> () {
-    loop {
-        let date = Local::now();
-        let output = format!("{}", date.format("%Y-%m-%d %H:%M:%S"));
-        let formatters = [
-            Format::Foreground(Color::White),
-            Format::Background(Color::Black),
-        ];
-
-        let output_formatted = formatters.iter().fold(output, |acc, f| f.apply(acc));
-        tx.send(
-            (ThreadResponse {
-                block: Block::Clock,
-                msg: output_formatted,
-            }),
-        ).unwrap();
-
-        thread::sleep(time::Duration::from_millis(1000));
-    }
 }
 
 fn render_blocks(blocks: &HashMap<Block, String>) -> String {
@@ -46,16 +32,26 @@ fn render_blocks(blocks: &HashMap<Block, String>) -> String {
     for screen in [0, 1].iter() {
         acc.push(format!("%{{S{}}}", screen));
 
+        acc.push(String::from("%{l}"));
+
+        acc.push(match blocks.get(&Block::I3(0)) {
+            Some(s) => s.clone(),
+            None => String::from(""),
+        });
+
         acc.push(String::from("%{c}"));
 
-        acc.push(blocks.get(&Block::Clock).unwrap().to_string());
+        acc.push(match blocks.get(&Block::Clock) {
+            Some(s) => s.clone(),
+            None => String::from(""),
+        });
     }
 
     return acc.join("");
 }
 
 fn main() {
-    let blockRenderers = [clock];
+    let blockRenderers = get_block_renderers();
 
     let (tx, rx) = mpsc::channel();
 
@@ -65,16 +61,14 @@ fn main() {
     }
 
     let mut block_responses = HashMap::new();
-    for msg in rx {
-        let ThreadResponse {
-            block: block,
-            msg: msg,
-        } = msg;
+    for ThreadResponse { block, msg } in rx {
         block_responses.insert(block, msg);
 
         let output = render_blocks(&block_responses);
-        print!("\n%{{S1}}{}", output);
 
-        stdout().flush();
+        let stdout = io::stdout(); // get the global stdout entity
+        let handle = stdout.lock(); // acquire a lock on it
+        let mut handle = io::BufWriter::new(handle); // optional: wrap that handle in a buffer
+        writeln!(handle, "{}", output); // add `?` if you care about errors here
     }
 }
