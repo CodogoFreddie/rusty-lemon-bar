@@ -5,3 +5,4 @@ authors = ["Freddie Ridell <freddie@codogo.io>"]
 
 [dependencies]
 chrono = "0.4"
+systemstat = "0.1.3"

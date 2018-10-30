@@ -53,7 +53,7 @@ impl Format {
             Underline => format!("%{{+u}}{}%{{-u}}", s),
             Overline => format!("%{{+o}}{}%{{-o}}", s),
             SwapAt(_) => Format::Swap.apply(s),
-            Swap => format!("%{{R}}{}%{{R}}", s), 
+            Swap => format!("%{{R}}{}%{{R}}", s),
         }
     }
 }
