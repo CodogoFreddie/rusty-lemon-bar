@@ -16,6 +16,71 @@ use self::i3ipc::Subscription;
 use super::format::{Color, Format};
 use super::{Block, ThreadResponse};
 
+fn disk(tx: sync::mpsc::Sender<super::ThreadResponse>) -> () {
+    let colors = vec![
+        Color::Yellow,
+        Color::Green,
+        Color::Blue,
+    ];
+
+    let sys = System::new();
+
+    loop {
+        let mounts_info : String = match sys.mounts() {
+            Ok(mounts) => mounts.iter()
+                .filter( |mount| mount.total.as_usize() > 2000000000 )
+                .map( |mount| format!(" {}: {} ", mount.fs_mounted_on, mount.avail) )
+                .collect::<Vec<String>>()
+                .join(""),
+            _ => String::from(""),
+        };
+
+        let output_formatted = Format::Foreground(Color::Green).apply(mounts_info);
+
+        tx.send(
+            (ThreadResponse {
+                block: Block::Disk,
+                msg: output_formatted,
+            }),
+            ).unwrap();
+
+        thread::sleep(time::Duration::from_millis(10000));
+    }
+}
+
+fn cpu(tx: sync::mpsc::Sender<super::ThreadResponse>) -> () {
+    let sys = System::new();
+
+    loop { 
+        let memory = match sys.memory() {
+            Ok(mem) => format!("{}/{} ram", mem.total - mem.free, mem.total),
+            Err(_) => String::from(""),
+        };
+
+        let load = match sys.load_average() {
+            Ok(loadavg) => format!("{:.1} {:.1} {:.1} load", loadavg.one, loadavg.five, loadavg.fifteen),
+            Err(_) => String::from(""),
+        };
+
+        let output = format!(
+            " {} {} ",
+            Format::Foreground(Color::Purple).apply(memory),
+            Format::Foreground(Color::Blue).apply(load),
+            );
+
+        let output_formatted = Format::Background(Color::Black).apply(output);
+
+        tx.send(
+            (ThreadResponse {
+                block: Block::Cpu,
+                msg: output_formatted,
+            }),
+            ).unwrap();
+
+        thread::sleep(time::Duration::from_millis(3000));
+    }
+}
+
 fn battery(tx: sync::mpsc::Sender<super::ThreadResponse>) -> () {
     let sys = System::new();
 
@@ -30,12 +95,6 @@ fn battery(tx: sync::mpsc::Sender<super::ThreadResponse>) -> () {
             Err(_) => false,
         };
 
-        let formatters = [
-            Format::SwapAt(percentage / 100.0),
-            Format::Foreground(Color::Black),
-            Format::Background( if percentage > 70.0 { Color::Green } else if percentage > 30.0 { Color::Orange } else { Color::Red } ),
-        ];
-            
         let done_time = Local::now() + chrono::Duration::seconds(remaining_time.as_secs() as i64);
 
         let output = format!(
@@ -45,6 +104,11 @@ fn battery(tx: sync::mpsc::Sender<super::ThreadResponse>) -> () {
             done_time.format("%H:%M:%S"),
             );
 
+        let formatters = [
+            Format::SwapAt(percentage / 100.0),
+            Format::Foreground(Color::Black),
+            Format::Background( if percentage > 70.0 { Color::Green } else if percentage > 30.0 { Color::Orange } else { Color::Red } ),
+        ];
 
         let output_formatted = formatters.iter().fold(output, |acc, f| f.apply(acc));
 
@@ -55,7 +119,7 @@ fn battery(tx: sync::mpsc::Sender<super::ThreadResponse>) -> () {
             }),
             ).unwrap();
 
-        thread::sleep(time::Duration::from_millis(1000));
+        thread::sleep(time::Duration::from_millis(2000));
     }
 }
 
@@ -146,8 +210,10 @@ type BlockArray = Vec<fn(sync::mpsc::Sender<ThreadResponse>)>;
 
 pub fn get_block_renderers() -> BlockArray {
     vec![
-        //clock,
-        //i3,
-        battery
+        clock,
+        i3,
+        battery,
+        cpu,
+        disk,
     ]
 }

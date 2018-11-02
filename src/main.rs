@@ -19,6 +19,7 @@ pub enum Block {
     Network,
     Disk,
     Battery,
+    Cpu,
 }
 
 pub struct ThreadResponse {
@@ -49,6 +50,16 @@ fn render_blocks(blocks: &HashMap<Block, String>) -> String {
         acc.push(String::from("%{r}"));
 
         acc.push(match blocks.get(&Block::Battery) {
+            Some(s) => s.clone(),
+            None => String::from(""),
+        });
+
+        acc.push(match blocks.get(&Block::Disk) {
+            Some(s) => s.clone(),
+            None => String::from(""),
+        });
+
+        acc.push(match blocks.get(&Block::Cpu) {
             Some(s) => s.clone(),
             None => String::from(""),
         });
