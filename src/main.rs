@@ -1,11 +1,10 @@
 use std::collections::HashMap;
 use std::io;
-use std::io::{stdout, Write};
+use std::io::Write;
 use std::sync::mpsc;
-use std::{thread, time};
+use std::thread;
 
 extern crate chrono;
-use chrono::prelude::*;
 
 mod format;
 use format::{Color, Format};
@@ -19,6 +18,7 @@ pub enum Block {
     I3(u8),
     Network,
     Disk,
+    Battery,
 }
 
 pub struct ThreadResponse {
@@ -42,6 +42,13 @@ fn render_blocks(blocks: &HashMap<Block, String>) -> String {
         acc.push(String::from("%{c}"));
 
         acc.push(match blocks.get(&Block::Clock) {
+            Some(s) => s.clone(),
+            None => String::from(""),
+        });
+
+        acc.push(String::from("%{r}"));
+
+        acc.push(match blocks.get(&Block::Battery) {
             Some(s) => s.clone(),
             None => String::from(""),
         });

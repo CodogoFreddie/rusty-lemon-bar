@@ -1,17 +1,63 @@
 use std::collections::HashMap;
 use std::{sync, thread, time};
+use std::time::Duration;
+
+extern crate systemstat;
+use self::systemstat::{System, Platform};
 
 extern crate chrono;
 use chrono::prelude::*;
 
 extern crate i3ipc;
-use self::i3ipc::event::Event;
 use self::i3ipc::I3Connection;
 use self::i3ipc::I3EventListener;
 use self::i3ipc::Subscription;
 
 use super::format::{Color, Format};
 use super::{Block, ThreadResponse};
+
+fn battery(tx: sync::mpsc::Sender<super::ThreadResponse>) -> () {
+    let sys = System::new();
+
+    loop {
+        let ( percentage, remaining_time ) = match sys.battery_life() {
+            Ok(battery) => ( battery.remaining_capacity * 100.0, battery.remaining_time ),
+            Err(_) => ( 0.0, Duration::new(0, 0) ),
+        };
+
+        let is_charging = match sys.on_ac_power() {
+            Ok(power) => power,
+            Err(_) => false,
+        };
+
+        let formatters = [
+            Format::SwapAt(percentage / 100.0),
+            Format::Foreground(Color::Black),
+            Format::Background( if percentage > 70.0 { Color::Green } else if percentage > 30.0 { Color::Orange } else { Color::Red } ),
+        ];
+            
+        let done_time = Local::now() + chrono::Duration::seconds(remaining_time.as_secs() as i64);
+
+        let output = format!(
+            " {} {}% {} ",
+            if is_charging { ">" } else { "<" },
+            percentage as u8,
+            done_time.format("%H:%M:%S"),
+            );
+
+
+        let output_formatted = formatters.iter().fold(output, |acc, f| f.apply(acc));
+
+        tx.send(
+            (ThreadResponse {
+                block: Block::Battery,
+                msg: output_formatted,
+            }),
+            ).unwrap();
+
+        thread::sleep(time::Duration::from_millis(1000));
+    }
+}
 
 fn clock(tx: sync::mpsc::Sender<super::ThreadResponse>) -> () {
     loop {
@@ -28,7 +74,7 @@ fn clock(tx: sync::mpsc::Sender<super::ThreadResponse>) -> () {
                 block: Block::Clock,
                 msg: output_formatted,
             }),
-        ).unwrap();
+            ).unwrap();
 
         thread::sleep(time::Duration::from_millis(1000));
     }
@@ -92,12 +138,16 @@ fn i3(tx: sync::mpsc::Sender<super::ThreadResponse>) -> () {
                 block: Block::I3(0),
                 msg: output_blocks.join(""),
             }),
-        ).unwrap();
+            ).unwrap();
     }
 }
 
-type BlockArray = Vec<fn(std::sync::mpsc::Sender<ThreadResponse>)>;
+type BlockArray = Vec<fn(sync::mpsc::Sender<ThreadResponse>)>;
 
 pub fn get_block_renderers() -> BlockArray {
-    vec![clock, i3]
+    vec![
+        //clock,
+        //i3,
+        battery
+    ]
 }

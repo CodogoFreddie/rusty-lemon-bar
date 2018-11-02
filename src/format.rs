@@ -52,8 +52,15 @@ impl Format {
             Background(ref col) => format!("%{{B{}}}{}%{{B-}}", col, s),
             Underline => format!("%{{+u}}{}%{{-u}}", s),
             Overline => format!("%{{+o}}{}%{{-o}}", s),
-            SwapAt(_) => Format::Swap.apply(s),
             Swap => format!("%{{R}}{}%{{R}}", s),
+            SwapAt(f) => {
+                let length = s.len();
+                let split_at = ( f * (length as f32) ) as usize;
+                let start: String = s.chars().take(split_at).collect();
+                let end: String = s.chars().skip(split_at).collect();   
+
+                return format!("{}{}", start, Format::Swap.apply(end));
+            },
         }
     }
 }
