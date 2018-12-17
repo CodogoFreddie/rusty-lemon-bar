@@ -5,7 +5,6 @@ pub enum Color {
     Black,
     Red,
     Green,
-    Yellow,
     Blue,
     Purple,
     Orange,
@@ -20,7 +19,6 @@ impl Color {
             Black => "#2c292d",
             Red => "#ff6188",
             Green => "#a9dc76",
-            Yellow => "#ffd866",
             Blue => "#78dce8",
             Purple => "#ab9df2",
             Orange => "#fc9867",
@@ -38,8 +36,6 @@ impl fmt::Display for Color {
 pub enum Format {
     Foreground(Color),
     Background(Color),
-    Underline,
-    Overline,
     Swap,
     SwapAt(f32),
 }
@@ -51,17 +47,15 @@ impl Format {
         match *self {
             Foreground(ref col) => format!("%{{F{}}}{}%{{F-}}", col, s),
             Background(ref col) => format!("%{{B{}}}{}%{{B-}}", col, s),
-            Underline => format!("%{{+u}}{}%{{-u}}", s),
-            Overline => format!("%{{+o}}{}%{{-o}}", s),
             Swap => format!("%{{R}}{}%{{R}}", s),
             SwapAt(f) => {
                 let length = s.len();
-                let split_at = ( f * (length as f32) ) as usize;
+                let split_at = (f * (length as f32)) as usize;
                 let start: String = s.chars().take(split_at).collect();
-                let end: String = s.chars().skip(split_at).collect();   
+                let end: String = s.chars().skip(split_at).collect();
 
                 return format!("{}{}", start, Format::Swap.apply(end));
-            },
+            }
         }
     }
 }

@@ -69,11 +69,11 @@ fn render_blocks(blocks: &HashMap<Block, String>) -> String {
 }
 
 fn main() {
-    let blockRenderers = get_block_renderers();
+    let block_renderers = get_block_renderers();
 
     let (tx, rx) = mpsc::channel();
 
-    for &block in blockRenderers.iter() {
+    for &block in block_renderers.iter() {
         let transmitter = mpsc::Sender::clone(&tx);
         thread::spawn(move || block(transmitter));
     }
@@ -87,6 +87,6 @@ fn main() {
         let stdout = io::stdout(); // get the global stdout entity
         let handle = stdout.lock(); // acquire a lock on it
         let mut handle = io::BufWriter::new(handle); // optional: wrap that handle in a buffer
-        writeln!(handle, "{}", output); // add `?` if you care about errors here
+        writeln!(handle, "{}", output).unwrap();
     }
 }

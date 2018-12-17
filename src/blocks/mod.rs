@@ -1,9 +1,9 @@
 use std::collections::HashMap;
-use std::{sync, thread, time};
 use std::time::Duration;
+use std::{sync, thread, time};
 
 extern crate systemstat;
-use self::systemstat::{System, Platform};
+use self::systemstat::{Platform, System};
 
 extern crate chrono;
 use chrono::prelude::*;
@@ -17,19 +17,14 @@ use super::format::{Color, Format};
 use super::{Block, ThreadResponse};
 
 fn disk(tx: sync::mpsc::Sender<super::ThreadResponse>) -> () {
-    let colors = vec![
-        Color::Yellow,
-        Color::Green,
-        Color::Blue,
-    ];
-
     let sys = System::new();
 
     loop {
-        let mounts_info : String = match sys.mounts() {
-            Ok(mounts) => mounts.iter()
-                .filter( |mount| mount.total.as_usize() > 2000000000 )
-                .map( |mount| format!(" {}: {} ", mount.fs_mounted_on, mount.avail) )
+        let mounts_info: String = match sys.mounts() {
+            Ok(mounts) => mounts
+                .iter()
+                .filter(|mount| mount.total.as_usize() > 4000000000)
+                .map(|mount| format!(" {}: {} ", mount.fs_mounted_on, mount.avail))
                 .collect::<Vec<String>>()
                 .join(""),
             _ => String::from(""),
@@ -38,11 +33,12 @@ fn disk(tx: sync::mpsc::Sender<super::ThreadResponse>) -> () {
         let output_formatted = Format::Foreground(Color::Green).apply(mounts_info);
 
         tx.send(
-            (ThreadResponse {
+            ThreadResponse {
                 block: Block::Disk,
                 msg: output_formatted,
-            }),
-            ).unwrap();
+            },
+        )
+        .unwrap();
 
         thread::sleep(time::Duration::from_millis(10000));
     }
@@ -51,14 +47,17 @@ fn disk(tx: sync::mpsc::Sender<super::ThreadResponse>) -> () {
 fn cpu(tx: sync::mpsc::Sender<super::ThreadResponse>) -> () {
     let sys = System::new();
 
-    loop { 
+    loop {
         let memory = match sys.memory() {
             Ok(mem) => format!("{}/{} ram", mem.total - mem.free, mem.total),
             Err(_) => String::from(""),
         };
 
         let load = match sys.load_average() {
-            Ok(loadavg) => format!("{:.1} {:.1} {:.1} load", loadavg.one, loadavg.five, loadavg.fifteen),
+            Ok(loadavg) => format!(
+                "{:.1} {:.1} {:.1} load",
+                loadavg.one, loadavg.five, loadavg.fifteen
+            ),
             Err(_) => String::from(""),
         };
 
@@ -66,16 +65,17 @@ fn cpu(tx: sync::mpsc::Sender<super::ThreadResponse>) -> () {
             " {} {} ",
             Format::Foreground(Color::Purple).apply(memory),
             Format::Foreground(Color::Blue).apply(load),
-            );
+        );
 
         let output_formatted = Format::Background(Color::Black).apply(output);
 
         tx.send(
-            (ThreadResponse {
+            ThreadResponse {
                 block: Block::Cpu,
                 msg: output_formatted,
-            }),
-            ).unwrap();
+            },
+        )
+        .unwrap();
 
         thread::sleep(time::Duration::from_millis(3000));
     }
@@ -85,9 +85,9 @@ fn battery(tx: sync::mpsc::Sender<super::ThreadResponse>) -> () {
     let sys = System::new();
 
     loop {
-        let ( percentage, remaining_time ) = match sys.battery_life() {
-            Ok(battery) => ( battery.remaining_capacity * 100.0, battery.remaining_time ),
-            Err(_) => ( 0.0, Duration::new(0, 0) ),
+        let (percentage, remaining_time) = match sys.battery_life() {
+            Ok(battery) => (battery.remaining_capacity * 100.0, battery.remaining_time),
+            Err(_) => (0.0, Duration::new(0, 0)),
         };
 
         let is_charging = match sys.on_ac_power() {
@@ -102,22 +102,29 @@ fn battery(tx: sync::mpsc::Sender<super::ThreadResponse>) -> () {
             if is_charging { ">" } else { "<" },
             percentage as u8,
             done_time.format("%H:%M:%S"),
-            );
+        );
 
         let formatters = [
             Format::SwapAt(percentage / 100.0),
             Format::Foreground(Color::Black),
-            Format::Background( if percentage > 70.0 { Color::Green } else if percentage > 30.0 { Color::Orange } else { Color::Red } ),
+            Format::Background(if percentage > 70.0 {
+                Color::Green
+            } else if percentage > 30.0 {
+                Color::Orange
+            } else {
+                Color::Red
+            }),
         ];
 
         let output_formatted = formatters.iter().fold(output, |acc, f| f.apply(acc));
 
         tx.send(
-            (ThreadResponse {
+            ThreadResponse {
                 block: Block::Battery,
                 msg: output_formatted,
-            }),
-            ).unwrap();
+            },
+        )
+        .unwrap();
 
         thread::sleep(time::Duration::from_millis(2000));
     }
@@ -133,12 +140,11 @@ fn clock(tx: sync::mpsc::Sender<super::ThreadResponse>) -> () {
         ];
 
         let output_formatted = formatters.iter().fold(output, |acc, f| f.apply(acc));
-        tx.send(
-            (ThreadResponse {
-                block: Block::Clock,
-                msg: output_formatted,
-            }),
-            ).unwrap();
+        tx.send(ThreadResponse {
+            block: Block::Clock,
+            msg: output_formatted,
+        })
+        .unwrap();
 
         thread::sleep(time::Duration::from_millis(1000));
     }
@@ -154,7 +160,7 @@ fn i3(tx: sync::mpsc::Sender<super::ThreadResponse>) -> () {
     listener.subscribe(&subs).unwrap();
 
     // handle them
-    for event in listener.listen() {
+    for _event in listener.listen() {
         let i3ipc::reply::Workspaces { workspaces } = connection.get_workspaces().unwrap();
 
         let mut workspaces_by_output = HashMap::new();
@@ -174,7 +180,7 @@ fn i3(tx: sync::mpsc::Sender<super::ThreadResponse>) -> () {
 
         let mut output_blocks = Vec::<String>::new();
 
-        for (output, workspaces) in &workspaces_by_output {
+        for (_output, workspaces) in &workspaces_by_output {
             for workspace in workspaces {
                 let formatters = [
                     Format::Foreground(if workspace.visible {
@@ -197,23 +203,16 @@ fn i3(tx: sync::mpsc::Sender<super::ThreadResponse>) -> () {
             }
         }
 
-        tx.send(
-            (ThreadResponse {
-                block: Block::I3(0),
-                msg: output_blocks.join(""),
-            }),
-            ).unwrap();
+        tx.send(ThreadResponse {
+            block: Block::I3(0),
+            msg: output_blocks.join(""),
+        })
+        .unwrap();
     }
 }
 
 type BlockArray = Vec<fn(sync::mpsc::Sender<ThreadResponse>)>;
 
 pub fn get_block_renderers() -> BlockArray {
-    vec![
-        clock,
-        i3,
-        battery,
-        cpu,
-        disk,
-    ]
+    vec![clock, i3, battery, cpu, disk]
 }
