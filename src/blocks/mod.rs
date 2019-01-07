@@ -101,15 +101,15 @@ fn battery(tx: sync::mpsc::Sender<super::ThreadResponse>) -> () {
             " {} {}% {} ",
             if is_charging { ">" } else { "<" },
             percentage as u8,
-            done_time.format("%H:%M:%S"),
+            done_time.format("%H:%M"),
         );
 
         let formatters = [
             Format::SwapAt(percentage / 100.0),
             Format::Foreground(Color::Black),
-            Format::Background(if percentage > 70.0 {
+            Format::Background(if percentage > 40.0 {
                 Color::Green
-            } else if percentage > 30.0 {
+            } else if percentage > 20.0 {
                 Color::Orange
             } else {
                 Color::Red
