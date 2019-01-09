@@ -126,7 +126,7 @@ fn battery(tx: sync::mpsc::Sender<super::ThreadResponse>) -> () {
         )
         .unwrap();
 
-        thread::sleep(time::Duration::from_millis(2000));
+        thread::sleep(time::Duration::from_millis(10000));
     }
 }
 
