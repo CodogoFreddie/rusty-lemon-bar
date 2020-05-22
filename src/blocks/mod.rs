@@ -48,7 +48,7 @@ fn cpu(tx: sync::mpsc::Sender<super::ThreadResponse>) -> () {
     loop {
         let memory = match sys.memory() {
             Ok(mem) => format!(
-                "{}/{} ram",
+                "{}/{}",
                 systemstat::data::ByteSize::b(mem.total.as_u64() - mem.free.as_u64()),
                 mem.total
             ),
@@ -57,7 +57,7 @@ fn cpu(tx: sync::mpsc::Sender<super::ThreadResponse>) -> () {
 
         let load = match sys.load_average() {
             Ok(loadavg) => format!(
-                "{:.1} {:.1} {:.1} load",
+                "{:.1} {:.1} {:.1}",
                 loadavg.one, loadavg.five, loadavg.fifteen
             ),
             Err(_) => String::from(""),
