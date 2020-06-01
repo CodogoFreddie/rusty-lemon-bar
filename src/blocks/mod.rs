@@ -47,11 +47,19 @@ fn cpu(tx: sync::mpsc::Sender<super::ThreadResponse>) -> () {
 
     loop {
         let memory = match sys.memory() {
-            Ok(mem) => format!(
-                "{}/{}",
-                systemstat::data::ByteSize::b(mem.total.as_u64() - mem.free.as_u64()),
-                mem.total
-            ),
+            Ok(mem) => {
+                let total = mem.total.as_u64();
+                let used = total - mem.free.as_u64();
+                let text = format!(" {}/{} ", systemstat::data::ByteSize::b(used), mem.total);
+
+                let formatters = [
+                    Format::SwapAt(used as f32 / total as f32),
+                    Format::Foreground(Color::Black),
+                    Format::Background(Color::Purple),
+                ];
+
+                formatters.iter().fold(text, |acc, f| f.apply(acc))
+            }
             Err(_) => String::from(""),
         };
 
@@ -64,8 +72,8 @@ fn cpu(tx: sync::mpsc::Sender<super::ThreadResponse>) -> () {
         };
 
         let output = format!(
-            " {} {} ",
-            Format::Foreground(Color::Purple).apply(memory),
+            "{} {} ",
+            memory,
             Format::Foreground(Color::Blue).apply(load),
         );
 
