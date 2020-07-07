@@ -139,7 +139,7 @@ fn battery(tx: sync::mpsc::Sender<super::ThreadResponse>) -> () {
 fn clock(tx: sync::mpsc::Sender<super::ThreadResponse>) -> () {
     loop {
         let date = Local::now();
-        let output = format!("{}", date.format("%Y-%m-%d %H:%M:%S"));
+        let output = format!("{}", date.format("%a %b %Y-%m-%d %H:%M:%S"));
         let formatters = [
             Format::Foreground(Color::White),
             Format::Background(Color::Black),
